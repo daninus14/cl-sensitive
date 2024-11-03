@@ -1,2 +1,47 @@
-# cl-sensitive
+* cl-sensitive
 CLOS API For Dealing With Sensitive Data
+
+* Functionality
+** =sensitive-metaclass=
+This provides a boolean slot option called =:sensitve= which can be set to =t= to specialize encoders, printers, and other methods which may expose sensitve data.
+
+To check if a slot is sensitve do =sensitive-slot-value= on a given slot.
+
+#+BEGIN_SRC common-lisp
+        (ql:quickload "cl-sensitive")
+
+        (defclass c3 ()
+          ((name :accessor name :initarg :name :initform nil)
+           (secret :accessor secret :initarg :secret :initform nil :sensitive t)
+           (hello :accessor hello :initarg :hello :initform nil))
+          (:metaclass sensitive:sensitive-metaclass))
+
+        (closer-mop:ensure-finalized (find-class 'c3))
+
+        CL-USER> (closer-mop:class-slots (find-class 'c3))
+        (#<SENSITIVE:SENSITIVE-STANDARD-EFFECTIVE-SLOT-DEFINITION COMMON-LISP-USER::NAME>
+         #<SENSITIVE:SENSITIVE-STANDARD-EFFECTIVE-SLOT-DEFINITION COMMON-LISP-USER::SECRET>
+         #<SENSITIVE:SENSITIVE-STANDARD-EFFECTIVE-SLOT-DEFINITION COMMON-LISP-USER::HELLO>)
+
+      CL-USER> (sensitive:sensitive-slot-value (second (closer-mop:class-slots (find-class 'c3))))
+      T
+      CL-USER> (sensitive:sensitive-slot-value (first (closer-mop:class-slots (find-class 'c3))))
+      NIL
+
+
+      CL-USER> (closer-mop:class-slots (class-of (make-instance 'c3 :name "john" :secret "hello world!" :hello "Miami")))
+    (#<SENSITIVE:SENSITIVE-STANDARD-EFFECTIVE-SLOT-DEFINITION COMMON-LISP-USER::NAME>
+     #<SENSITIVE:SENSITIVE-STANDARD-EFFECTIVE-SLOT-DEFINITION COMMON-LISP-USER::SECRET>
+     #<SENSITIVE:SENSITIVE-STANDARD-EFFECTIVE-SLOT-DEFINITION COMMON-LISP-USER::HELLO>)
+  
+    CL-USER> (mapcar #'sensitive:sensitive-slot-value
+                     (closer-mop:class-slots (class-of (make-instance 'c3 :name "john" :secret "hello world!" :hello "Miami"))))
+    (NIL T NIL)
+
+#+END_SRC
+
+This can be useful for specializing methodss on the metaclass to check if slots are encoded.
+
+If it's not possible to specialize on the metaclass, in practice, I've specialized in the most common superclass and then create a helper generic function which takes in as an argument the metaclass, and then we can specialize on the metaclass.
+
+See [[https://github.com/daninus14/jzon-util][jzon-util]] for a sample usage of this.
